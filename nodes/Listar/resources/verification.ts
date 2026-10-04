@@ -32,9 +32,9 @@ export const phoneOperations: INodeProperties[] = [
 				name: 'Check WhatsApp',
 				value: 'checkWhatsApp',
 				description: 'Check whether a phone number has a WhatsApp account',
-				// WhatsApp is a brand name: the sentence-case rule would lowercase it.
-				// eslint-disable-next-line n8n-nodes-base/node-param-operation-option-action-miscased
-				action: 'Check a phone on WhatsApp',
+				// Lowercased on purpose: n8n's scanner enforces sentence case on actions
+				// and ignores eslint-disable comments.
+				action: 'Check a phone for a whatsapp account',
 			},
 			{
 				name: 'Verify Ownership',

@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-listar",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "n8n node for Listar: find phone numbers, emails and decision makers of companies",
 	"license": "MIT",
 	"homepage": "https://listar.fr",

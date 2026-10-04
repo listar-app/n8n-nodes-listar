@@ -49,7 +49,7 @@ Read your list (Google Sheets, CSV, CRM...), then add a Listar node with **Perso
 
 Most searches complete within a minute, some take a few minutes. By default the node waits for each result, up to **Max Wait (Seconds)**. A search still running when the wait runs out is not lost: the item comes out with `status: "pending"` and the search `id`, and the **Get Result** operation fetches it later. It is billed once, when it completes.
 
-For large lists, turn **Wait for Result** off: every search is launched at once and returns its ID. Then add a Wait node (a few minutes) followed by a Listar node with **Get Result** on `{{ $json.id }}`.
+For large lists, turn **Wait for Result** off: every search is launched at once and returns its ID. Then add a Wait node (a few minutes) followed by a Listar node with **Get Result** on `{{ $json.id }}`. At most 20 company searches can run at the same time per account: a launch beyond that is retried automatically after the delay the API asks for, then fails if the limit is still reached.
 
 ### From a company to its contacts
 
@@ -61,13 +61,13 @@ With **Simplify** on (default), a person result is one flat item: `phone`, `phon
 
 ### Errors
 
-When the Listar credit does not cover a request, nothing is delivered and the node stops with a clear message. Top up in the app: a result already found is settled automatically and can then be fetched with **Get Result**. Turn on **Settings > On Error > Continue** to keep processing the other items.
+When the Listar credit does not cover a request, nothing is delivered and the node stops with a clear message that gives the search ID. Top up in the app: a result already found is settled automatically and can then be fetched with **Get Result** and that ID. With **Continue** on error, the error item keeps the search `id` too. Turn on **Settings > On Error > Continue** to keep processing the other items.
 
 Do not turn on **Retry On Fail** for the Enrich operations: a retried launch is a new search, billed again.
 
 ## Pricing
 
-Every operation is billed to the Listar credit of the organization that owns the API key, at the same prices as the [Listar API](https://listar.fr/en/pricing). Nothing is billed when nothing is found.
+Every operation is billed to the Listar credit of the organization that owns the API key, at the same prices as the [Listar API](https://listar.fr/en/pricing). An enrichment that finds nothing is not billed. Verifications are billed per checked number or email, as described in the [API reference](https://api.listar.fr/docs).
 
 ## Compatibility
 

@@ -109,8 +109,20 @@ export class Listar implements INodeType {
 				returnData.push({ json: result, pairedItem: { item: itemIndex } });
 			} catch (error) {
 				if (this.continueOnFail()) {
+					const { description, httpCode, context } = error as {
+						description?: string | null;
+						httpCode?: string | null;
+						context?: { searchId?: string };
+					};
+					// The search ID survives here: a search that may still complete
+					// (and be billed) can be collected later instead of relaunched.
 					returnData.push({
-						json: { error: (error as Error).message },
+						json: {
+							error: (error as Error).message,
+							...(description ? { description } : {}),
+							...(httpCode ? { httpCode } : {}),
+							...(context?.searchId ? { id: context.searchId } : {}),
+						},
 						pairedItem: { item: itemIndex },
 					});
 					continue;

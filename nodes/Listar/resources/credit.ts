@@ -13,7 +13,7 @@ export const creditOperations: INodeProperties[] = [
 				name: 'Get Balance',
 				value: 'getBalance',
 				description: 'Get the remaining Listar credit',
-				action: 'Get the credit balance',
+				action: 'Get the remaining credit balance',
 			},
 		],
 		default: 'getBalance',

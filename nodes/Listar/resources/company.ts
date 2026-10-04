@@ -1,7 +1,7 @@
 import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
-import { getResult, listarRequest, waitForResult } from '../transport';
-import { resultIdField, simplifyField, waitFields } from './shared';
+import { getResult, launchRequest, waitForResult } from '../transport';
+import { compact, resultId, resultIdField, simplifyField, waitFields } from './shared';
 
 const show = (operation: string[]) => ({ show: { resource: ['company'], operation } });
 
@@ -17,13 +17,13 @@ export const companyOperations: INodeProperties[] = [
 				name: 'Enrich',
 				value: 'enrich',
 				description: 'Get the company info and its decision makers',
-				action: 'Enrich a company',
+				action: 'Get a company and its decision makers',
 			},
 			{
 				name: 'Get Result',
 				value: 'getResult',
 				description: 'Get the result of a company enrichment launched earlier',
-				action: 'Get a company enrichment result',
+				action: 'Get the result of a company search',
 			},
 		],
 		default: 'enrich',
@@ -136,19 +136,17 @@ export async function executeCompany(
 	itemIndex: number,
 ): Promise<IDataObject> {
 	if (operation === 'getResult') {
-		const id = this.getNodeParameter('resultId', itemIndex) as string;
+		const id = resultId.call(this, itemIndex);
 		return getResult.call(this, resultPath(id), id, itemIndex);
 	}
 
 	const additionalFields = this.getNodeParameter('additionalFields', itemIndex) as IDataObject;
 	const withContacts = this.getNodeParameter('withContacts', itemIndex) as boolean;
-	const body: IDataObject = Object.fromEntries(
-		Object.entries({
-			companyName: this.getNodeParameter('companyName', itemIndex) as string,
-			domain: this.getNodeParameter('domain', itemIndex) as string,
-			...additionalFields,
-		}).filter(([, value]) => typeof value !== 'string' || value.trim() !== ''),
-	);
+	const body = compact({
+		companyName: this.getNodeParameter('companyName', itemIndex) as string,
+		domain: this.getNodeParameter('domain', itemIndex) as string,
+		...additionalFields,
+	});
 	if (!body.companyName && !body.domain && !body.siren && !body.siret) {
 		throw new NodeOperationError(
 			this.getNode(),
@@ -161,7 +159,7 @@ export async function executeCompany(
 		body.contactsTargetCount = this.getNodeParameter('contactsTargetCount', itemIndex);
 	}
 
-	const launched = await listarRequest.call(this, 'POST', '/company-enrichment/search', body);
+	const launched = await launchRequest.call(this, '/company-enrichment/search', body, itemIndex);
 	const waitForCompletion = this.getNodeParameter('waitForCompletion', itemIndex) as boolean;
 	const maxWait = waitForCompletion
 		? (this.getNodeParameter('maxWaitSeconds', itemIndex) as number)
@@ -173,13 +171,14 @@ export async function executeCompany(
 export const simplifyCompany = (response: IDataObject): IDataObject => {
 	if (response.status === 'pending') return response;
 	const result = (response.result as IDataObject | undefined) ?? {};
-	const contacts = ((result.contacts as IDataObject[] | null | undefined) ?? []).map((contact) => ({
-		fullName: contact.fullName ?? null,
-		firstName: contact.firstName ?? null,
-		lastName: contact.lastName ?? null,
-		jobTitle: contact.jobTitle ?? contact.mandateRole ?? null,
-		linkedinUrl: contact.linkedinUrl ?? null,
-	}));
+	const people = (list: unknown) =>
+		((list as IDataObject[] | null | undefined) ?? []).map((person) => ({
+			fullName: person.fullName ?? null,
+			firstName: person.firstName ?? null,
+			lastName: person.lastName ?? null,
+			jobTitle: person.jobTitle ?? person.mandateRole ?? null,
+			linkedinUrl: person.linkedinUrl ?? null,
+		}));
 	return {
 		id: response.id,
 		status: 'completed',
@@ -196,6 +195,14 @@ export const simplifyCompany = (response: IDataObject): IDataObject => {
 		country: result.country ?? null,
 		phone: result.phone ?? null,
 		linkedinUrl: result.linkedinUrl ?? null,
-		contacts,
+		// Set when the match is a branch rather than the head office, whose
+		// address is the one above.
+		establishmentSiret: result.establishmentSiret ?? null,
+		establishmentAddress: result.establishmentAddress ?? null,
+		establishmentCity: result.establishmentCity ?? null,
+		establishmentPostalCode: result.establishmentPostalCode ?? null,
+		// Legal representatives from the register, returned even without contacts.
+		directors: people(result.directors),
+		contacts: people(result.contacts),
 	};
 };

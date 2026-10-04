@@ -1,5 +1,5 @@
 import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
-import { finalBody, listarRequest } from '../transport';
+import { finalBody, launchRequest } from '../transport';
 
 export const emailOperations: INodeProperties[] = [
 	{
@@ -13,7 +13,7 @@ export const emailOperations: INodeProperties[] = [
 				name: 'Verify',
 				value: 'verify',
 				description: 'Check whether an email address can receive mail',
-				action: 'Verify an email',
+				action: 'Check whether an email can receive mail',
 			},
 		],
 		default: 'verify',
@@ -40,7 +40,7 @@ export const phoneOperations: INodeProperties[] = [
 				name: 'Verify Ownership',
 				value: 'verifyOwnership',
 				description: 'Check whether a phone number belongs to a given person',
-				action: 'Verify who owns a phone',
+				action: 'Check whether a phone belongs to a person',
 			},
 		],
 		default: 'verifyOwnership',
@@ -109,9 +109,12 @@ export async function executeEmail(
 	itemIndex: number,
 ): Promise<IDataObject> {
 	const email = (this.getNodeParameter('email', itemIndex) as string).trim();
-	const response = await listarRequest.call(this, 'POST', '/search/verify-emails', {
-		emails: [email],
-	});
+	const response = await launchRequest.call(
+		this,
+		'/search/verify-emails',
+		{ emails: [email] },
+		itemIndex,
+	);
 	return firstResult(finalBody.call(this, response, itemIndex));
 }
 
@@ -122,9 +125,12 @@ export async function executePhone(
 ): Promise<IDataObject> {
 	const phone = (this.getNodeParameter('phone', itemIndex) as string).trim();
 	if (operation === 'checkWhatsApp') {
-		const response = await listarRequest.call(this, 'POST', '/search/verify-whatsapp', {
-			phones: [phone],
-		});
+		const response = await launchRequest.call(
+			this,
+			'/search/verify-whatsapp',
+			{ phones: [phone] },
+			itemIndex,
+		);
 		return firstResult(finalBody.call(this, response, itemIndex));
 	}
 
@@ -133,8 +139,11 @@ export async function executePhone(
 		const value = (this.getNodeParameter(field, itemIndex) as string).trim();
 		if (value) contact[field] = value;
 	}
-	const response = await listarRequest.call(this, 'POST', '/search/verify-phone-ownership', {
-		contacts: [contact],
-	});
+	const response = await launchRequest.call(
+		this,
+		'/search/verify-phone-ownership',
+		{ contacts: [contact] },
+		itemIndex,
+	);
 	return firstResult(finalBody.call(this, response, itemIndex));
 }

@@ -1,6 +1,13 @@
 import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
-import { getResult, listarRequest, waitForResult } from '../transport';
-import { linkedinSlug, waitFields, resultIdField, simplifyField } from './shared';
+import { getResult, launchRequest, waitForResult } from '../transport';
+import {
+	compact,
+	linkedinSlug,
+	resultId,
+	resultIdField,
+	simplifyField,
+	waitFields,
+} from './shared';
 
 const show = (operation: string[]) => ({ show: { resource: ['person'], operation } });
 
@@ -16,13 +23,13 @@ export const personOperations: INodeProperties[] = [
 				name: 'Enrich',
 				value: 'enrich',
 				description: 'Find the phone number and email of a person',
-				action: 'Enrich a person',
+				action: 'Find the phone number and email of a person',
 			},
 			{
 				name: 'Get Result',
 				value: 'getResult',
 				description: 'Get the result of a person enrichment launched earlier',
-				action: 'Get a person enrichment result',
+				action: 'Get the result of a person search',
 			},
 		],
 		default: 'enrich',
@@ -140,18 +147,13 @@ export const personFields: INodeProperties[] = [
 
 const resultPath = (id: string) => `/search/results/${encodeURIComponent(id)}`;
 
-const compact = (fields: IDataObject): IDataObject =>
-	Object.fromEntries(
-		Object.entries(fields).filter(([, value]) => typeof value !== 'string' || value.trim() !== ''),
-	);
-
 export async function executePerson(
 	this: IExecuteFunctions,
 	operation: string,
 	itemIndex: number,
 ): Promise<IDataObject> {
 	if (operation === 'getResult') {
-		const id = this.getNodeParameter('resultId', itemIndex) as string;
+		const id = resultId.call(this, itemIndex);
 		return getResult.call(this, resultPath(id), id, itemIndex);
 	}
 
@@ -160,7 +162,11 @@ export async function executePerson(
 		firstName: this.getNodeParameter('firstName', itemIndex) as string,
 		lastName: this.getNodeParameter('lastName', itemIndex) as string,
 		company: this.getNodeParameter('company', itemIndex) as string,
-		linkedinSlug: linkedinSlug(this.getNodeParameter('linkedin', itemIndex) as string),
+		linkedinSlug: linkedinSlug.call(
+			this,
+			this.getNodeParameter('linkedin', itemIndex) as string,
+			itemIndex,
+		),
 		...additionalFields,
 	});
 	body.enrichmentType = this.getNodeParameter('enrichmentType', itemIndex);
@@ -168,7 +174,7 @@ export async function executePerson(
 	// back at once, so a slow search is never lost (and paid for twice).
 	body.respondAsync = true;
 
-	const launched = await listarRequest.call(this, 'POST', '/search/unified', body);
+	const launched = await launchRequest.call(this, '/search/unified', body, itemIndex);
 	const waitForCompletion = this.getNodeParameter('waitForCompletion', itemIndex) as boolean;
 	const maxWait = waitForCompletion
 		? (this.getNodeParameter('maxWaitSeconds', itemIndex) as number)
@@ -198,6 +204,10 @@ export const simplifyPerson = (result: IDataObject): IDataObject => {
 		email: email.address ?? null,
 		emailStatus: email.verified ?? null,
 		emailType: email.type ?? null,
+		// The email's domain matches neither the company nor its official domain:
+		// check it before prospecting.
+		emailDomainUncorroborated: email.domainUncorroborated ?? null,
+		emailStale: email.stale ?? null,
 		creditDeductedCents: result.creditDeducted ?? 0,
 	};
 };

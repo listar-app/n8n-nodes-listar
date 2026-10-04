@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-listar.listar",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Sales", "Marketing"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/listar-app/n8n-nodes-listar#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/listar-app/n8n-nodes-listar#readme"
+			}
+		]
+	}
+}

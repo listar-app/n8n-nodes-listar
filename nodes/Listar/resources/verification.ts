@@ -1,0 +1,140 @@
+import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
+import { finalBody, listarRequest } from '../transport';
+
+export const emailOperations: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['email'] } },
+		options: [
+			{
+				name: 'Verify',
+				value: 'verify',
+				description: 'Check whether an email address can receive mail',
+				action: 'Verify an email',
+			},
+		],
+		default: 'verify',
+	},
+];
+
+export const phoneOperations: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['phone'] } },
+		options: [
+			{
+				name: 'Check WhatsApp',
+				value: 'checkWhatsApp',
+				description: 'Check whether a phone number has a WhatsApp account',
+				// WhatsApp is a brand name: the sentence-case rule would lowercase it.
+				// eslint-disable-next-line n8n-nodes-base/node-param-operation-option-action-miscased
+				action: 'Check a phone on WhatsApp',
+			},
+			{
+				name: 'Verify Ownership',
+				value: 'verifyOwnership',
+				description: 'Check whether a phone number belongs to a given person',
+				action: 'Verify who owns a phone',
+			},
+		],
+		default: 'verifyOwnership',
+	},
+];
+
+export const verificationFields: INodeProperties[] = [
+	{
+		displayName: 'Email',
+		name: 'email',
+		type: 'string',
+		placeholder: 'name@email.com',
+		required: true,
+		default: '',
+		displayOptions: { show: { resource: ['email'], operation: ['verify'] } },
+	},
+	{
+		displayName: 'Phone',
+		name: 'phone',
+		type: 'string',
+		required: true,
+		default: '',
+		placeholder: 'e.g. +33612345678',
+		displayOptions: { show: { resource: ['phone'] } },
+		description: 'Phone number in international format',
+	},
+	{
+		displayName: 'First Name',
+		name: 'firstName',
+		type: 'string',
+		default: '',
+		displayOptions: { show: { resource: ['phone'], operation: ['verifyOwnership'] } },
+		description: 'Required without a LinkedIn profile',
+	},
+	{
+		displayName: 'Last Name',
+		name: 'lastName',
+		type: 'string',
+		default: '',
+		displayOptions: { show: { resource: ['phone'], operation: ['verifyOwnership'] } },
+		description: 'Required without a LinkedIn profile',
+	},
+	{
+		displayName: 'LinkedIn Profile URL',
+		name: 'linkedinUrl',
+		type: 'string',
+		default: '',
+		placeholder: 'e.g. https://www.linkedin.com/in/jane-doe',
+		displayOptions: { show: { resource: ['phone'], operation: ['verifyOwnership'] } },
+		description: 'Enables a face comparison, much more precise than the name',
+	},
+];
+
+/** The single verdict of a one-entry verification request, with its cost. */
+const firstResult = (body: IDataObject): IDataObject => {
+	const [result] = (body.results as IDataObject[] | undefined) ?? [];
+	return {
+		...(result ?? {}),
+		creditDeductedCents: body.creditDeducted ?? 0,
+		creditRefundedCents: body.creditRefunded ?? 0,
+	};
+};
+
+export async function executeEmail(
+	this: IExecuteFunctions,
+	itemIndex: number,
+): Promise<IDataObject> {
+	const email = (this.getNodeParameter('email', itemIndex) as string).trim();
+	const response = await listarRequest.call(this, 'POST', '/search/verify-emails', {
+		emails: [email],
+	});
+	return firstResult(finalBody.call(this, response, itemIndex));
+}
+
+export async function executePhone(
+	this: IExecuteFunctions,
+	operation: string,
+	itemIndex: number,
+): Promise<IDataObject> {
+	const phone = (this.getNodeParameter('phone', itemIndex) as string).trim();
+	if (operation === 'checkWhatsApp') {
+		const response = await listarRequest.call(this, 'POST', '/search/verify-whatsapp', {
+			phones: [phone],
+		});
+		return firstResult(finalBody.call(this, response, itemIndex));
+	}
+
+	const contact: IDataObject = { phone };
+	for (const field of ['firstName', 'lastName', 'linkedinUrl']) {
+		const value = (this.getNodeParameter(field, itemIndex) as string).trim();
+		if (value) contact[field] = value;
+	}
+	const response = await listarRequest.call(this, 'POST', '/search/verify-phone-ownership', {
+		contacts: [contact],
+	});
+	return firstResult(finalBody.call(this, response, itemIndex));
+}

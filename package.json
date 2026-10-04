@@ -1,0 +1,57 @@
+{
+	"name": "n8n-nodes-listar",
+	"version": "0.1.0",
+	"description": "n8n node for Listar: find phone numbers, emails and decision makers of companies",
+	"license": "MIT",
+	"homepage": "https://listar.fr",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"listar",
+		"enrichment",
+		"b2b",
+		"phone",
+		"email",
+		"lead generation"
+	],
+	"author": {
+		"name": "Listar",
+		"email": "contact@listar.fr"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/listar-app/n8n-nodes-listar.git"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/ListarApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Listar/Listar.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "*",
+		"eslint": "9.32.0",
+		"prettier": "3.6.2",
+		"release-it": "^19.0.4",
+		"typescript": "5.9.2"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}

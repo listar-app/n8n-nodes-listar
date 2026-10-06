@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Required and optional parameters are separated: Person > Enrich, Company > Enrich and Phone > Verify Ownership start with a choice of identifier (Search By, Check Against) whose fields are required, every other detail goes in Additional Fields.
+- Phone numbers typed with separators ("+33 6 12 34 56 78") or a "00" prefix are sent in the compact international format the WhatsApp and ownership checks expect.
+- An empty required field (an expression resolving to nothing) stops the item with a clear error instead of launching a search.
+- Breaking: in existing Person > Enrich nodes, the company and the LinkedIn profile move to Additional Fields (or Search By: LinkedIn Profile); in Company > Enrich nodes, pick the identifier in Search By. Workflows built with 0.1.x need these fields set again.
+
 ## 0.1.3
 
 - Action names say what each operation returns, so AI agents pick the right tool with the automatic tool description.

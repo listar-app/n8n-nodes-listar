@@ -1,5 +1,7 @@
 import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 import { finalBody, launchRequest } from '../transport';
+import { compact } from './shared';
 
 export const emailOperations: INodeProperties[] = [
 	{
@@ -47,6 +49,34 @@ export const phoneOperations: INodeProperties[] = [
 	},
 ];
 
+const ownership = (checkAgainst?: string) => ({
+	show: {
+		resource: ['phone'],
+		operation: ['verifyOwnership'],
+		...(checkAgainst ? { checkAgainst: [checkAgainst] } : {}),
+	},
+});
+
+/** The required fields of each "Check Against" choice. */
+const owners: Record<string, string[]> = {
+	name: ['firstName', 'lastName'],
+	linkedin: ['linkedinUrl'],
+};
+
+const labels: Record<string, string> = {
+	firstName: 'First Name',
+	lastName: 'Last Name',
+	linkedinUrl: 'LinkedIn Profile URL',
+};
+
+/**
+ * "+33612345678" from a number typed with separators ("+33 6 12 34 56 78",
+ * "+1 (415) 555-0100") or a "00" international prefix: the API only takes
+ * the compact international format.
+ */
+const internationalPhone = (value: string): string =>
+	value.replace(/[\s.()/-]/g, '').replace(/^00/, '+');
+
 export const verificationFields: INodeProperties[] = [
 	{
 		displayName: 'Email',
@@ -68,29 +98,78 @@ export const verificationFields: INodeProperties[] = [
 		description: 'Phone number in international format',
 	},
 	{
+		displayName: 'Check Against',
+		name: 'checkAgainst',
+		type: 'options',
+		options: [
+			{ name: 'Name', value: 'name', description: 'First and last name of the expected owner' },
+			{
+				name: 'LinkedIn Profile',
+				value: 'linkedin',
+				description: 'Enables a face comparison, much more precise than the name',
+			},
+		],
+		default: 'name',
+		displayOptions: ownership(),
+		description: 'Who the phone number should belong to',
+	},
+	{
 		displayName: 'First Name',
 		name: 'firstName',
 		type: 'string',
+		required: true,
 		default: '',
-		displayOptions: { show: { resource: ['phone'], operation: ['verifyOwnership'] } },
-		description: 'Required without a LinkedIn profile',
+		displayOptions: ownership('name'),
 	},
 	{
 		displayName: 'Last Name',
 		name: 'lastName',
 		type: 'string',
+		required: true,
 		default: '',
-		displayOptions: { show: { resource: ['phone'], operation: ['verifyOwnership'] } },
-		description: 'Required without a LinkedIn profile',
+		displayOptions: ownership('name'),
 	},
 	{
 		displayName: 'LinkedIn Profile URL',
 		name: 'linkedinUrl',
 		type: 'string',
+		required: true,
 		default: '',
 		placeholder: 'e.g. https://www.linkedin.com/in/jane-doe',
-		displayOptions: { show: { resource: ['phone'], operation: ['verifyOwnership'] } },
-		description: 'Enables a face comparison, much more precise than the name',
+		displayOptions: ownership('linkedin'),
+	},
+	{
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: ownership(),
+		options: [
+			{
+				displayName: 'First Name',
+				name: 'firstName',
+				type: 'string',
+				default: '',
+				displayOptions: { hide: { '/checkAgainst': ['name'] } },
+			},
+			{
+				displayName: 'Last Name',
+				name: 'lastName',
+				type: 'string',
+				default: '',
+				displayOptions: { hide: { '/checkAgainst': ['name'] } },
+			},
+			{
+				displayName: 'LinkedIn Profile URL',
+				name: 'linkedinUrl',
+				type: 'string',
+				default: '',
+				placeholder: 'e.g. https://www.linkedin.com/in/jane-doe',
+				displayOptions: { hide: { '/checkAgainst': ['linkedin'] } },
+				description: 'Enables a face comparison, much more precise than the name',
+			},
+		],
 	},
 ];
 
@@ -123,7 +202,7 @@ export async function executePhone(
 	operation: string,
 	itemIndex: number,
 ): Promise<IDataObject> {
-	const phone = (this.getNodeParameter('phone', itemIndex) as string).trim();
+	const phone = internationalPhone(this.getNodeParameter('phone', itemIndex) as string);
 	if (operation === 'checkWhatsApp') {
 		const response = await launchRequest.call(
 			this,
@@ -134,10 +213,19 @@ export async function executePhone(
 		return firstResult(finalBody.call(this, response, itemIndex));
 	}
 
-	const contact: IDataObject = { phone };
-	for (const field of ['firstName', 'lastName', 'linkedinUrl']) {
-		const value = (this.getNodeParameter(field, itemIndex) as string).trim();
-		if (value) contact[field] = value;
+	const required = owners[this.getNodeParameter('checkAgainst', itemIndex) as string] ?? [];
+	const contact = compact({
+		...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
+		...Object.fromEntries(
+			required.map((name) => [name, this.getNodeParameter(name, itemIndex) as string]),
+		),
+		phone,
+	});
+	const missing = required.find((name) => !contact[name]);
+	if (missing) {
+		throw new NodeOperationError(this.getNode(), `${labels[missing]} is empty`, {
+			itemIndex,
+		});
 	}
 	const response = await launchRequest.call(
 		this,

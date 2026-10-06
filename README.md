@@ -41,7 +41,7 @@ The node can also be used as a tool by n8n AI agents.
 
 ### Enrich a list of people
 
-Read your list (Google Sheets, CSV, CRM...), then add a Listar node with **Person > Enrich**. Map the first name, last name and company of each row, and the LinkedIn profile whenever you have it: it is the strongest identifier. A bare name is often not enough to deliver anything.
+Read your list (Google Sheets, CSV, CRM...), then add a Listar node with **Person > Enrich**. **Search By** sets what identifies the person and makes its fields required: the name (first and last name), the LinkedIn profile (the strongest identifier), a known email (to find the phone) or a known phone (to find the email). Every other known detail goes in **Additional Fields**: add at least the company to a name, a bare name is often not enough to deliver anything.
 
 **Data to Find** limits the search to the phone or the email: only the requested channel is delivered and billed.
 
@@ -53,7 +53,9 @@ For large lists, turn **Wait for Result** off: every search is launched at once 
 
 ### From a company to its contacts
 
-**Company > Enrich** returns the decision makers of a company, without their phone or email. Split the `contacts` array (Split Out node), then run **Person > Enrich** on each contact with its first name, last name, the company name and its `linkedinUrl`.
+**Company > Enrich** returns the decision makers of a company, without their phone or email. Split the `contacts` array (Split Out node), then run **Person > Enrich** on each contact, searched by its `linkedinUrl` (or by its first and last name), with the company name in **Additional Fields**.
+
+**Company > Enrich** works the same way: **Search By** picks the required identifier (company name, domain, SIREN or SIRET), the others go in **Additional Fields**. **Phone > Verify Ownership** checks the number against a name or a LinkedIn profile.
 
 ### Output
 

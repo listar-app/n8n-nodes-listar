@@ -4,6 +4,16 @@ import { getResult, launchRequest, waitForResult } from '../transport';
 import { compact, resultId, resultIdField, simplifyField, waitFields } from './shared';
 
 const show = (operation: string[]) => ({ show: { resource: ['company'], operation } });
+const searchBy = (value: string) => ({
+	show: { resource: ['company'], operation: ['enrich'], companySearchBy: [value] },
+});
+
+const labels: Record<string, string> = {
+	companyName: 'Company Name',
+	domain: 'Domain',
+	siren: 'SIREN',
+	siret: 'SIRET',
+};
 
 export const companyOperations: INodeProperties[] = [
 	{
@@ -32,21 +42,64 @@ export const companyOperations: INodeProperties[] = [
 
 export const companyFields: INodeProperties[] = [
 	{
+		displayName: 'Search By',
+		name: 'companySearchBy',
+		type: 'options',
+		options: [
+			{
+				name: 'Company Name',
+				value: 'companyName',
+				description: 'Add the city or the domain: a name alone can match several companies',
+			},
+			{
+				name: 'Domain',
+				value: 'domain',
+				description: 'Website domain: the most reliable way to identify the company',
+			},
+			{ name: 'SIREN', value: 'siren', description: 'French company number (9 digits)' },
+			{
+				name: 'SIRET',
+				value: 'siret',
+				description: 'French establishment number (14 digits): the most precise anchor in France',
+			},
+		],
+		default: 'companyName',
+		displayOptions: show(['enrich']),
+		description: 'What identifies the company. Add any other known detail in Additional Fields.',
+	},
+	{
 		displayName: 'Company Name',
 		name: 'companyName',
 		type: 'string',
+		required: true,
 		default: '',
-		displayOptions: show(['enrich']),
+		displayOptions: searchBy('companyName'),
 		description: 'Add the city or the domain: a name alone can match several companies',
 	},
 	{
 		displayName: 'Domain',
 		name: 'domain',
 		type: 'string',
+		required: true,
 		default: '',
 		placeholder: 'e.g. listar.fr',
-		displayOptions: show(['enrich']),
-		description: 'Website domain: the most reliable way to identify the company',
+		displayOptions: searchBy('domain'),
+	},
+	{
+		displayName: 'SIREN',
+		name: 'siren',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: searchBy('siren'),
+	},
+	{
+		displayName: 'SIRET',
+		name: 'siret',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: searchBy('siret'),
 	},
 	{
 		displayName: 'Include Contacts',
@@ -83,6 +136,13 @@ export const companyFields: INodeProperties[] = [
 				default: '',
 			},
 			{
+				displayName: 'Company Name',
+				name: 'companyName',
+				type: 'string',
+				default: '',
+				displayOptions: { hide: { '/companySearchBy': ['companyName'] } },
+			},
+			{
 				displayName: 'Contact to Find',
 				name: 'contactHint',
 				type: 'string',
@@ -99,6 +159,15 @@ export const companyFields: INodeProperties[] = [
 				description: 'Required when the company is not French',
 			},
 			{
+				displayName: 'Domain',
+				name: 'domain',
+				type: 'string',
+				default: '',
+				placeholder: 'e.g. listar.fr',
+				displayOptions: { hide: { '/companySearchBy': ['domain'] } },
+				description: 'Website domain: the most reliable way to identify the company',
+			},
+			{
 				displayName: 'Job Titles to Target',
 				name: 'hintTitles',
 				type: 'string',
@@ -112,6 +181,7 @@ export const companyFields: INodeProperties[] = [
 				name: 'siren',
 				type: 'string',
 				default: '',
+				displayOptions: { hide: { '/companySearchBy': ['siren'] } },
 				description: 'French company number (9 digits)',
 			},
 			{
@@ -119,6 +189,7 @@ export const companyFields: INodeProperties[] = [
 				name: 'siret',
 				type: 'string',
 				default: '',
+				displayOptions: { hide: { '/companySearchBy': ['siret'] } },
 				description: 'French establishment number (14 digits): the most precise anchor in France',
 			},
 		],
@@ -142,17 +213,15 @@ export async function executeCompany(
 
 	const additionalFields = this.getNodeParameter('additionalFields', itemIndex) as IDataObject;
 	const withContacts = this.getNodeParameter('withContacts', itemIndex) as boolean;
+	const identifier = this.getNodeParameter('companySearchBy', itemIndex) as string;
 	const body = compact({
-		companyName: this.getNodeParameter('companyName', itemIndex) as string,
-		domain: this.getNodeParameter('domain', itemIndex) as string,
 		...additionalFields,
+		[identifier]: this.getNodeParameter(identifier, itemIndex) as string,
 	});
-	if (!body.companyName && !body.domain && !body.siren && !body.siret) {
-		throw new NodeOperationError(
-			this.getNode(),
-			'Give the company name, its domain, its SIREN or its SIRET',
-			{ itemIndex },
-		);
+	if (!body[identifier]) {
+		throw new NodeOperationError(this.getNode(), `${labels[identifier]} is empty`, {
+			itemIndex,
+		});
 	}
 	body.withContacts = withContacts;
 	if (withContacts) {

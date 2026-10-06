@@ -1,4 +1,5 @@
 import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 import { getResult, launchRequest, waitForResult } from '../transport';
 import {
 	compact,
@@ -10,6 +11,25 @@ import {
 } from './shared';
 
 const show = (operation: string[]) => ({ show: { resource: ['person'], operation } });
+const searchBy = (value: string) => ({
+	show: { resource: ['person'], operation: ['enrich'], searchBy: [value] },
+});
+
+/** The required fields of each "Search By" choice. */
+const identifiers: Record<string, string[]> = {
+	name: ['firstName', 'lastName'],
+	linkedin: ['linkedin'],
+	email: ['email'],
+	phone: ['phone'],
+};
+
+const labels: Record<string, string> = {
+	firstName: 'First Name',
+	lastName: 'Last Name',
+	linkedin: 'LinkedIn Profile',
+	email: 'Email',
+	phone: 'Phone',
+};
 
 export const personOperations: INodeProperties[] = [
 	{
@@ -51,35 +71,68 @@ export const personFields: INodeProperties[] = [
 		description: 'Only the requested channel is delivered and billed',
 	},
 	{
+		displayName: 'Search By',
+		name: 'searchBy',
+		type: 'options',
+		options: [
+			{ name: 'Name', value: 'name', description: 'First and last name of the person' },
+			{
+				name: 'LinkedIn Profile',
+				value: 'linkedin',
+				description: 'The strongest identifier of the person',
+			},
+			{ name: 'Email', value: 'email', description: 'A known email, to find the phone number' },
+			{ name: 'Phone', value: 'phone', description: 'A known phone number, to find the email' },
+		],
+		default: 'name',
+		displayOptions: show(['enrich']),
+		description: 'What identifies the person. Add any other known detail in Additional Fields.',
+	},
+	{
 		displayName: 'First Name',
 		name: 'firstName',
 		type: 'string',
+		required: true,
 		default: '',
-		displayOptions: show(['enrich']),
+		displayOptions: searchBy('name'),
 	},
 	{
 		displayName: 'Last Name',
 		name: 'lastName',
 		type: 'string',
+		required: true,
 		default: '',
-		displayOptions: show(['enrich']),
-	},
-	{
-		displayName: 'Company',
-		name: 'company',
-		type: 'string',
-		default: '',
-		displayOptions: show(['enrich']),
-		description: 'Current company of the person',
+		displayOptions: searchBy('name'),
 	},
 	{
 		displayName: 'LinkedIn Profile',
 		name: 'linkedin',
 		type: 'string',
+		required: true,
 		default: '',
 		placeholder: 'e.g. https://www.linkedin.com/in/jane-doe',
-		displayOptions: show(['enrich']),
-		description: 'Profile URL or slug: the strongest identifier of the person',
+		displayOptions: searchBy('linkedin'),
+		description: 'Profile URL or slug',
+	},
+	{
+		displayName: 'Email',
+		name: 'email',
+		type: 'string',
+		required: true,
+		placeholder: 'name@email.com',
+		default: '',
+		displayOptions: searchBy('email'),
+		description: 'A known email of the person',
+	},
+	{
+		displayName: 'Phone',
+		name: 'phone',
+		type: 'string',
+		required: true,
+		default: '',
+		placeholder: 'e.g. +33612345678',
+		displayOptions: searchBy('phone'),
+		description: 'A known phone number of the person',
 	},
 	{
 		displayName: 'Additional Fields',
@@ -94,6 +147,13 @@ export const personFields: INodeProperties[] = [
 				name: 'city',
 				type: 'string',
 				default: '',
+			},
+			{
+				displayName: 'Company',
+				name: 'company',
+				type: 'string',
+				default: '',
+				description: 'Current company of the person: strongly recommended with a name',
 			},
 			{
 				displayName: 'Company Website',
@@ -116,7 +176,15 @@ export const personFields: INodeProperties[] = [
 				type: 'string',
 				placeholder: 'name@email.com',
 				default: '',
+				displayOptions: { hide: { '/searchBy': ['email'] } },
 				description: 'A known email of the person, to find their phone number',
+			},
+			{
+				displayName: 'First Name',
+				name: 'firstName',
+				type: 'string',
+				default: '',
+				displayOptions: { hide: { '/searchBy': ['name'] } },
 			},
 			{
 				displayName: 'Job Title',
@@ -126,10 +194,27 @@ export const personFields: INodeProperties[] = [
 				description: 'Used to tell the person apart from namesakes',
 			},
 			{
+				displayName: 'Last Name',
+				name: 'lastName',
+				type: 'string',
+				default: '',
+				displayOptions: { hide: { '/searchBy': ['name'] } },
+			},
+			{
+				displayName: 'LinkedIn Profile',
+				name: 'linkedin',
+				type: 'string',
+				default: '',
+				placeholder: 'e.g. https://www.linkedin.com/in/jane-doe',
+				displayOptions: { hide: { '/searchBy': ['linkedin'] } },
+				description: 'Profile URL or slug: the strongest identifier of the person',
+			},
+			{
 				displayName: 'Phone',
 				name: 'phone',
 				type: 'string',
 				default: '',
+				displayOptions: { hide: { '/searchBy': ['phone'] } },
 				description: 'A known phone number of the person, to find their email',
 			},
 			{
@@ -158,17 +243,21 @@ export async function executePerson(
 	}
 
 	const additionalFields = this.getNodeParameter('additionalFields', itemIndex) as IDataObject;
-	const body = compact({
-		firstName: this.getNodeParameter('firstName', itemIndex) as string,
-		lastName: this.getNodeParameter('lastName', itemIndex) as string,
-		company: this.getNodeParameter('company', itemIndex) as string,
-		linkedinSlug: linkedinSlug.call(
-			this,
-			this.getNodeParameter('linkedin', itemIndex) as string,
-			itemIndex,
-		),
+	const required = identifiers[this.getNodeParameter('searchBy', itemIndex) as string] ?? [];
+	const fields = compact({
 		...additionalFields,
+		...Object.fromEntries(
+			required.map((name) => [name, this.getNodeParameter(name, itemIndex) as string]),
+		),
 	});
+	const missing = required.find((name) => !fields[name]);
+	if (missing) {
+		throw new NodeOperationError(this.getNode(), `${labels[missing]} is empty`, {
+			itemIndex,
+		});
+	}
+	const { linkedin, ...body } = fields;
+	if (linkedin) body.linkedinSlug = linkedinSlug.call(this, linkedin as string, itemIndex);
 	body.enrichmentType = this.getNodeParameter('enrichmentType', itemIndex);
 	// Launched without holding the response, then polled: the search ID comes
 	// back at once, so a slow search is never lost (and paid for twice).

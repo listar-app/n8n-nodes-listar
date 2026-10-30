@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Person > Enrich returns the current job title and company of the person's LinkedIn profile, free with every phone or email search: simplified output adds `currentJobTitle`, `currentCompany` and `positionObservedAt`.
+- **Data to Find > LinkedIn Profile Only** finds the LinkedIn profile without any phone or email search, billed only when it tells something new.
+
 ## 0.2.0
 
 - Required and optional parameters are separated: Person > Enrich, Company > Enrich and Phone > Verify Ownership start with a choice of identifier (Search By, Check Against) whose fields are required, every other detail goes in Additional Fields.

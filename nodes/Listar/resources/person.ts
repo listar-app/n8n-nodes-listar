@@ -65,10 +65,16 @@ export const personFields: INodeProperties[] = [
 			{ name: 'Phone and Email', value: 'both' },
 			{ name: 'Phone Only', value: 'phone' },
 			{ name: 'Email Only', value: 'email' },
+			{
+				name: 'LinkedIn Profile Only',
+				value: 'none',
+				description: 'URL, current job title and company, without any phone or email search',
+			},
 		],
 		default: 'both',
 		displayOptions: show(['enrich']),
-		description: 'Only the requested channel is delivered and billed',
+		description:
+			'Only the requested channel is delivered and billed. The LinkedIn profile (URL, current job title and company) comes free with a phone or email search.',
 	},
 	{
 		displayName: 'Search By',
@@ -275,6 +281,7 @@ export async function executePerson(
 export const simplifyPerson = (result: IDataObject): IDataObject => {
 	if (result.status === 'pending') return result;
 	const profile = ((result.profiles as IDataObject[] | undefined) ?? [])[0] ?? {};
+	const linkedin = (result.linkedinProfile as IDataObject | undefined) ?? {};
 	const phone = (result.bestPhone as IDataObject | undefined) ?? {};
 	const email = (result.bestEmail as IDataObject | undefined) ?? {};
 	return {
@@ -284,7 +291,11 @@ export const simplifyPerson = (result: IDataObject): IDataObject => {
 		lastName: profile.lastName ?? null,
 		company: profile.company ?? null,
 		jobTitle: profile.jobTitle ?? null,
-		linkedinUrl: profile.linkedinUrl ?? null,
+		linkedinUrl: linkedin.url ?? profile.linkedinUrl ?? null,
+		// LinkedIn profile channel: the position LinkedIn shows now.
+		currentJobTitle: linkedin.jobTitle ?? null,
+		currentCompany: linkedin.company ?? null,
+		positionObservedAt: linkedin.observedAt ?? null,
 		phone: phone.number ?? null,
 		phoneType: phone.type ?? null,
 		phoneUsage: phone.usage ?? null,

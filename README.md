@@ -20,7 +20,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 | Resource | Operation        | What it does                                                                                                                         |
 | -------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Person   | Enrich           | Finds the phone number and/or email of a person from their name, company, LinkedIn profile, city...                                  |
+| Person   | Enrich           | Finds the phone number, email and/or LinkedIn profile (current job title and company) of a person from their name, company, city... |
 | Person   | Get Result       | Fetches the result of a person enrichment launched earlier                                                                           |
 | Company  | Enrich           | Returns the company info (register data, domain, industry, headcount...) and its decision makers (name, job title, LinkedIn profile) |
 | Company  | Get Result       | Fetches the result of a company enrichment launched earlier                                                                          |
@@ -43,7 +43,7 @@ The node can also be used as a tool by n8n AI agents.
 
 Read your list (Google Sheets, CSV, CRM...), then add a Listar node with **Person > Enrich**. **Search By** sets what identifies the person and makes its fields required: the name (first and last name), the LinkedIn profile (the strongest identifier), a known email (to find the phone) or a known phone (to find the email). Every other known detail goes in **Additional Fields**: add at least the company to a name, a bare name is often not enough to deliver anything.
 
-**Data to Find** limits the search to the phone or the email: only the requested channel is delivered and billed.
+**Data to Find** limits the search to the phone or the email: only the requested channel is delivered and billed. The person's LinkedIn profile comes free with every search: its URL, current job title and company (`currentJobTitle`, `currentCompany`, `positionObservedAt`). **LinkedIn Profile Only** runs no phone or email search, to qualify a list of people cheaply: it is billed only when it tells something the item did not carry (a found URL, a job title or a company).
 
 ### Waiting for results
 

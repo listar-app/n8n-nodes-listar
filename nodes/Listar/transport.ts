@@ -59,7 +59,9 @@ export async function launchRequest(
 	path: string,
 	body: IDataObject,
 	itemIndex: number,
+	options: { retryBusyAccount?: boolean } = {},
 ): Promise<ListarResponse> {
+	const { retryBusyAccount = true } = options;
 	for (let attempt = 1; ; attempt++) {
 		let response: ListarResponse;
 		try {
@@ -73,6 +75,10 @@ export async function launchRequest(
 			});
 		}
 		if (response.statusCode !== 429 || attempt === LAUNCH_ATTEMPTS) return response;
+		// A 429 without Retry-After is the account's cap on searches running at
+		// once, not the rate limit. A search that runs for minutes will not free
+		// its slot within the retries: wait for it only when asked.
+		if (response.retryAfter === undefined && !retryBusyAccount) return response;
 		await sleep(Math.min(response.retryAfter ?? 10, MAX_RETRY_AFTER_SECONDS) * 1000);
 	}
 }
@@ -128,7 +134,7 @@ export function finalBody(
 		429: {
 			message: 'Too many requests sent to Listar',
 			description:
-				'Wait a minute, or process fewer items at once (at most 20 company searches can run at the same time).' +
+				'Wait a minute, or process fewer items at once: each account runs a limited number of searches at the same time (20 company searches, 3 people searches).' +
 				collectLater,
 		},
 	};

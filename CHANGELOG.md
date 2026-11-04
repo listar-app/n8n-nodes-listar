@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- New **People Search** resource: **Search** finds the people who hold a role without knowing their company (job titles, countries or cities, seniority, industry, company headcount), and **Started Within (Days)** keeps only who just took the job ("the new heads of sales in France over the last 2 months"). Billed per person delivered; the people come without phone or email and are saved in a Listar list (`listId`). **Get Result** collects a search launched earlier. Job Titles, Countries and the other lists also take an array from an expression.
+
 ## 0.3.0
 
 - Person > Enrich returns the current job title and company of the person's LinkedIn profile, free with every phone or email search: simplified output adds `currentJobTitle`, `currentCompany` and `positionObservedAt`.

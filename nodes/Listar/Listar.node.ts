@@ -16,6 +16,12 @@ import {
 import { creditOperations, executeCredit } from './resources/credit';
 import { executePerson, personFields, personOperations, simplifyPerson } from './resources/person';
 import {
+	executePeopleSearch,
+	peopleSearchFields,
+	peopleSearchOperations,
+	simplifyPeopleSearch,
+} from './resources/peopleSearch';
+import {
 	emailOperations,
 	executeEmail,
 	executePhone,
@@ -31,7 +37,7 @@ export class Listar implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Find phone numbers, emails and decision makers with Listar',
+		description: 'Find phone numbers, emails, decision makers and people by role with Listar',
 		defaults: {
 			name: 'Listar',
 		},
@@ -54,6 +60,7 @@ export class Listar implements INodeType {
 					{ name: 'Company', value: 'company' },
 					{ name: 'Credit', value: 'credit' },
 					{ name: 'Email', value: 'email' },
+					{ name: 'People Search', value: 'peopleSearch' },
 					{ name: 'Person', value: 'person' },
 					{ name: 'Phone', value: 'phone' },
 				],
@@ -61,11 +68,13 @@ export class Listar implements INodeType {
 			},
 			...personOperations,
 			...companyOperations,
+			...peopleSearchOperations,
 			...emailOperations,
 			...phoneOperations,
 			...creditOperations,
 			...personFields,
 			...companyFields,
+			...peopleSearchFields,
 			...verificationFields,
 		],
 	};
@@ -89,6 +98,11 @@ export class Listar implements INodeType {
 					result = await executeCompany.call(this, operation, itemIndex);
 					if (this.getNodeParameter('simplify', itemIndex) as boolean) {
 						result = simplifyCompany(result);
+					}
+				} else if (resource === 'peopleSearch') {
+					result = await executePeopleSearch.call(this, operation, itemIndex);
+					if (this.getNodeParameter('simplify', itemIndex) as boolean) {
+						result = simplifyPeopleSearch(result);
 					}
 				} else if (resource === 'email') {
 					result = await executeEmail.call(this, itemIndex);

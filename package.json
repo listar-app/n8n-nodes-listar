@@ -1,7 +1,7 @@
 {
 	"name": "n8n-nodes-listar",
-	"version": "0.3.0",
-	"description": "n8n node for Listar: find phone numbers, emails and decision makers of companies",
+	"version": "0.4.0",
+	"description": "n8n node for Listar: find phone numbers, emails, decision makers of companies and people by role (including who just took the job)",
 	"license": "MIT",
 	"homepage": "https://listar.fr",
 	"keywords": [
@@ -12,7 +12,9 @@
 		"b2b",
 		"phone",
 		"email",
-		"lead generation"
+		"lead generation",
+		"prospecting",
+		"job change"
 	],
 	"author": {
 		"name": "Listar",

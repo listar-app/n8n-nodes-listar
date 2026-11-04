@@ -18,16 +18,18 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 ## Operations
 
-| Resource | Operation        | What it does                                                                                                                         |
-| -------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Person   | Enrich           | Finds the phone number, email and/or LinkedIn profile (current job title and company) of a person from their name, company, city... |
-| Person   | Get Result       | Fetches the result of a person enrichment launched earlier                                                                           |
-| Company  | Enrich           | Returns the company info (register data, domain, industry, headcount...) and its decision makers (name, job title, LinkedIn profile) |
-| Company  | Get Result       | Fetches the result of a company enrichment launched earlier                                                                          |
-| Email    | Verify           | Checks whether an email address can receive mail                                                                                     |
-| Phone    | Verify Ownership | Checks whether a phone number belongs to a given person                                                                              |
-| Phone    | Check WhatsApp   | Checks whether a phone number has a WhatsApp account                                                                                 |
-| Credit   | Get Balance      | Returns the remaining Listar credit                                                                                                  |
+| Resource      | Operation        | What it does                                                                                                                         |
+| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Person        | Enrich           | Finds the phone number, email and/or LinkedIn profile (current job title and company) of a person from their name, company, city...  |
+| Person        | Get Result       | Fetches the result of a person enrichment launched earlier                                                                           |
+| Company       | Enrich           | Returns the company info (register data, domain, industry, headcount...) and its decision makers (name, job title, LinkedIn profile) |
+| Company       | Get Result       | Fetches the result of a company enrichment launched earlier                                                                          |
+| People Search | Search           | Finds the people who hold a role without knowing their company (titles, place, seniority, company size), and who just took the job   |
+| People Search | Get Result       | Fetches the result of a people search launched earlier                                                                               |
+| Email         | Verify           | Checks whether an email address can receive mail                                                                                     |
+| Phone         | Verify Ownership | Checks whether a phone number belongs to a given person                                                                              |
+| Phone         | Check WhatsApp   | Checks whether a phone number has a WhatsApp account                                                                                 |
+| Credit        | Get Balance      | Returns the remaining Listar credit                                                                                                  |
 
 The node can also be used as a tool by n8n AI agents.
 
@@ -56,6 +58,10 @@ For large lists, turn **Wait for Result** off: every search is launched at once 
 **Company > Enrich** returns the decision makers of a company, without their phone or email. Split the `contacts` array (Split Out node), then run **Person > Enrich** on each contact, searched by its `linkedinUrl` (or by its first and last name), with the company name in **Additional Fields**.
 
 **Company > Enrich** works the same way: **Search By** picks the required identifier (company name, domain, SIREN or SIRET), the others go in **Additional Fields**. **Phone > Verify Ownership** checks the number against a name or a LinkedIn profile.
+
+### Who just took a job
+
+**People Search > Search** finds the people who hold a role without knowing their company. Give a **Brief** in plain words (a judge reads it to keep only the people who really hold the role), every form of the **Job Titles** (French and English, both genders, the acronyms: each one is matched as whole words), the **Countries**, and **Started Within (Days)** to keep only who just took the job: 60 for the last two months. The people come without phone or email, saved in a Listar list (`listId`): split the `people` array and run **Person > Enrich** on each `linkedinUrl`, or enrich the list in the Listar app. A search of a few hundred people takes a few minutes: raise **Max Wait**, or collect it later with **Get Result**. At most 3 people searches run at the same time per account: a launch beyond that fails at once instead of waiting. With **Simplify** on, `stopReason` and `sourceFailed` say why a list is short: only `exhausted` means there is nobody else.
 
 ### Output
 

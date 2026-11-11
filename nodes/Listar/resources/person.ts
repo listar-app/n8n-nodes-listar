@@ -1,6 +1,6 @@
-import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
-import { getResult, launchRequest, waitForResult } from '../transport';
+import type { IDataObject, IExecuteFunctions, INodeProperties, JsonObject } from 'n8n-workflow';
+import { NodeApiError, NodeOperationError } from 'n8n-workflow';
+import { finalBody, getResult, launchRequest, listarRequest, waitForResult } from '../transport';
 import {
 	compact,
 	linkedinSlug,
@@ -50,6 +50,13 @@ export const personOperations: INodeProperties[] = [
 				value: 'getResult',
 				description: 'Get the result of a person enrichment launched earlier',
 				action: 'Get the result of a person search',
+			},
+			{
+				name: 'Report Wrong Data',
+				value: 'report',
+				description:
+					'Report a delivered phone or email as wrong: it is never delivered nor billed to you again for that person',
+				action: 'Report wrong data on a person result',
 			},
 		],
 		default: 'enrich',
@@ -234,7 +241,149 @@ export const personFields: INodeProperties[] = [
 	...waitFields(show(['enrich'])),
 	resultIdField(show(['getResult'])),
 	simplifyField(show(['enrich', 'getResult'])),
+	{
+		displayName: 'Result ID',
+		name: 'reportedId',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: show(['report']),
+		description:
+			'The ID of the person result, or the ID of a row of a bulk enrichment (the ID of an item of its results)',
+	},
+	{
+		displayName: 'Issues',
+		name: 'reasons',
+		type: 'multiOptions',
+		required: true,
+		default: [],
+		displayOptions: show(['report']),
+		description:
+			"Every issue that applies. A phone or email reported as someone else's (or bounced) is never delivered nor billed to you again for that person, for a year.",
+		options: [
+			{
+				name: 'Email Bounced',
+				value: 'email_bounced',
+				description: 'The email bounced when used',
+			},
+			{
+				name: 'Left Company',
+				value: 'left_company',
+				description: 'The contact no longer works there (passed to the Listar team)',
+			},
+			{
+				name: 'Outdated Info',
+				value: 'outdated_info',
+				description: 'Anything else out of date (passed to the Listar team)',
+			},
+			{
+				name: 'Wrong Company',
+				value: 'wrong_company',
+				description: 'Another company than the one meant (passed to the Listar team)',
+			},
+			{
+				name: 'Wrong Email',
+				value: 'wrong_email',
+				description: 'The email belongs to someone else',
+			},
+			{
+				name: 'Wrong Person',
+				value: 'wrong_person',
+				description: 'The delivered profile is not the person searched',
+			},
+			{
+				name: 'Wrong Phone',
+				value: 'wrong_phone',
+				description: 'The phone number belongs to someone else',
+			},
+		],
+	},
+	{
+		displayName: 'Additional Fields',
+		name: 'reportFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: show(['report']),
+		options: [
+			{
+				displayName: 'Comment',
+				name: 'freeText',
+				type: 'string',
+				default: '',
+				description: 'What was observed, e.g. the bounce message',
+			},
+			{
+				displayName: 'Emails',
+				name: 'emails',
+				type: 'string',
+				default: '',
+				description:
+					'The wrong emails, separated by commas. Empty: every email of the result is reported.',
+			},
+			{
+				displayName: 'Phones',
+				name: 'phones',
+				type: 'string',
+				default: '',
+				description:
+					'The wrong numbers, in any format, separated by commas. Empty: every number of the result is reported.',
+			},
+		],
+	},
 ];
+
+/** A comma-separated list, trimmed, empty entries dropped. */
+const listOf = (value: unknown): string[] =>
+	typeof value === 'string'
+		? value
+				.split(',')
+				.map((entry) => entry.trim())
+				.filter(Boolean)
+		: [];
+
+/**
+ * Reports wrong data on a person result or a bulk row. Free; the values are
+ * withheld from every later delivery of the same person to this account.
+ */
+async function reportWrongData(this: IExecuteFunctions, itemIndex: number): Promise<IDataObject> {
+	const id = (this.getNodeParameter('reportedId', itemIndex) as string).trim();
+	if (!id) {
+		throw new NodeOperationError(this.getNode(), 'The result ID is empty', {
+			itemIndex,
+			description: 'Use the ID of the person result, or of the bulk row, to report.',
+		});
+	}
+	const reasons = this.getNodeParameter('reasons', itemIndex) as string[];
+	if (!reasons.length) {
+		throw new NodeOperationError(this.getNode(), 'Select at least one issue', { itemIndex });
+	}
+	const fields = this.getNodeParameter('reportFields', itemIndex) as IDataObject;
+	const phones = listOf(fields.phones);
+	const emails = listOf(fields.emails);
+	const freeText = typeof fields.freeText === 'string' ? fields.freeText.trim() : '';
+	const response = await listarRequest.call(this, 'POST', '/search/feedback', {
+		id,
+		rating: 'negative',
+		reasons,
+		...(phones.length ? { phones } : {}),
+		...(emails.length ? { emails } : {}),
+		...(freeText ? { freeText } : {}),
+	});
+	// Rated by another call at the same moment, or a run without a paying
+	// account: the generic 409 wording (another kind of search) would mislead.
+	if (response.statusCode === 409) {
+		const message = typeof response.body.message === 'string' ? response.body.message : 'Conflict';
+		throw new NodeApiError(this.getNode(), response.body as JsonObject, {
+			itemIndex,
+			httpCode: '409',
+			message: 'Listar could not save the report',
+			description: message,
+		});
+	}
+	finalBody.call(this, response, itemIndex);
+	return { id, reported: true, reasons };
+}
 
 const resultPath = (id: string) => `/search/results/${encodeURIComponent(id)}`;
 
@@ -247,6 +396,7 @@ export async function executePerson(
 		const id = resultId.call(this, itemIndex);
 		return getResult.call(this, resultPath(id), id, itemIndex);
 	}
+	if (operation === 'report') return reportWrongData.call(this, itemIndex);
 
 	const additionalFields = this.getNodeParameter('additionalFields', itemIndex) as IDataObject;
 	const required = identifiers[this.getNodeParameter('searchBy', itemIndex) as string] ?? [];

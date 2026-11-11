@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- New **Person > Report Wrong Data** operation: report a delivered phone or email as someone else's, or an email that bounced, with the result ID (or the ID of a bulk row). Free. For a year, the values reported are never delivered nor billed to you again for that person, so enriching them again finds another number, or nothing.
+
 ## 0.4.0
 
 - New **People Search** resource: **Search** finds the people who hold a role without knowing their company (job titles, countries or cities, seniority, industry, company headcount), and **Started Within (Days)** keeps only who just took the job ("the new heads of sales in France over the last 2 months"). Billed per person delivered; the people come without phone or email and are saved in a Listar list (`listId`). **Get Result** collects a search launched earlier. Job Titles, Countries and the other lists also take an array from an expression.

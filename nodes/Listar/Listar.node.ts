@@ -91,7 +91,7 @@ export class Listar implements INodeType {
 
 				if (resource === 'person') {
 					result = await executePerson.call(this, operation, itemIndex);
-					if (this.getNodeParameter('simplify', itemIndex) as boolean) {
+					if (operation !== 'report' && (this.getNodeParameter('simplify', itemIndex) as boolean)) {
 						result = simplifyPerson(result);
 					}
 				} else if (resource === 'company') {
